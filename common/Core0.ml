@@ -72,10 +72,10 @@ module Inline = Self.False
     let help = "Inline trivial conditions (useful when combine with loop unfolding)"
   end)
 
-module PreprocessOnly = Self.False
+module NondetAssignments = Self.False
   (struct
-    let option_name = "-cc-preprocess"
-    let help = ""
+    let option_name = "-cc-nondet-assignments"
+    let help = "Tranform all assigments to non-deterministic"
   end)
 
 module OverApproxFunctionPointers = Self.False
