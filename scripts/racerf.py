@@ -15,6 +15,7 @@ from check_sources import check_and_get_sources
 from transformations import transform_under_approx, transform_over_approx
 
 # SV-COMP mode constants
+SV_COMP_MODE = False
 SELF = os.path.dirname(os.path.realpath(__file__))
 OPAM_SYMLINK = "/tmp/_opam"
 OPAM_PATH = os.path.abspath(os.path.join(SELF, "_opam/"))
@@ -29,10 +30,10 @@ def remove_if_exists(path):
 
 class Runner:
     def __init__(self, sv_comp_mode=False, debug=False):
-        self.sv_comp_mode = sv_comp_mode
+        self.sv_comp_mode = sv_comp_mode or SV_COMP_MODE
         self.debug = debug
 
-        if sv_comp_mode:
+        if self.sv_comp_mode:
             self.framac_path = os.path.join(SELF, "_opam/bin/frama-c")
             self.models_path = os.path.join(SELF, "models")
             self.libc_path = os.path.join(SELF, "_opam/share/frama-c/share/libc")
