@@ -44,7 +44,7 @@ let is_precise access =
           let size = Z.of_int @@ Cil.bitsSizeOf @@ Ast_types.direct_element_type typ in
           let diff = Z.sub y x in
           Racer.debug "Base %a : size: %s, diff: %s" Base.pretty base (Z.to_string size) (Z.to_string diff);
-          Z.(<) size diff && access.precise
+          Z.(>=) size diff && access.precise
         | _ -> true
       end
     | None -> false
