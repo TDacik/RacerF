@@ -42,7 +42,7 @@ let main () =
 
   if not @@ Racer.SVWitnessPath.is_default () && RaceAnalysis.Result.has_must_race res then
     let race = RaceAnalysis.Result.choose res in
-    WitnessGenerator1.dump_trace race @@ Racer.SVWitnessPath.get ()
+    WitnessGenerator2.dump_trace race @@ Racer.SVWitnessPath.get ()
   else ();
 
   Core.finalize lockset_res thread_graph;

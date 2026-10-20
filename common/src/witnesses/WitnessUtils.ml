@@ -33,7 +33,7 @@ let now () =
 
 let metadata () = {
   producer = "RacerF";
-  version = "2.0";
+  version = Racer.version;
   spec = "CHECK( init(main()), LTL(G ! data-race) )";
   language = "C";
   files = get_file_hashes ();

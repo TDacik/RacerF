@@ -36,6 +36,8 @@ val get_name : t -> string
 
 val get_entry_point : t -> Kernel_function.t
 
+val get_create_stmt : t -> Cil_datatype.Stmt.t option
+
 val is_main : t -> bool
 
 val hash : t -> int

@@ -2,7 +2,7 @@
  *
  * Author: Tomas Dacik (idacik@fit.vut.cz), 2024 *)
 
-let version = "2.2"
+let version = "2.3"
 
 module Self = Plugin.Register
   (struct
@@ -61,8 +61,8 @@ module YamlReport = Self.Filepath
 module SVWitnessPath = Self.Filepath
   (struct
     let option_name = "-racer-witness-path"
-    let help = "Output software verification witness in format 1.0"
+    let help = "Output software verification witness in format 2.2"
     let arg_name = "path"
     let existence = Frama_c_kernel.Filepath.Indifferent
-    let file_kind = "graphml"
+    let file_kind = "yml"
   end)

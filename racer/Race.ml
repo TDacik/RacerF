@@ -15,6 +15,12 @@ type t = {
   accesses : MemoryAccess.t * MemoryAccess.t;
 }
 
+let map_accesses f {accesses=(a1, a2); _} = (f a1, f a2)
+
+let get_threads = map_accesses MemoryAccess.get_thread
+
+let get_stmts = map_accesses MemoryAccess.get_stmt
+
 (** Check whether a pair of accesses is a race *)
 let is_may_race threads parallel self other =
   let open ThreadAnalysis in
@@ -66,7 +72,6 @@ let is_unique_malloc parallel threads base = match base with
         all of them are unique. *)
     let stmt = CFG_utils.find_allocation_stmt base in
     let active_threads = ParallelAnalysis.Result.may_active_stmt parallel stmt in
-    Format.printf "%s" @@ Thread.Set.show active_threads;
     Thread.Set.cardinal active_threads == 1
     && Thread.Set.for_all (ThreadAnalysis.Result.is_unique threads) active_threads
   | _ -> true

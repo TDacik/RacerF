@@ -86,6 +86,8 @@ let get_name t = Format.asprintf "%a" Kernel_function.pretty t.entry_point
 
 let get_entry_point t = t.entry_point
 
+let get_create_stmt t = t.stmt
+
 let is_main t = t.is_main
 
 let hash t = Kernel_function.hash t.entry_point
