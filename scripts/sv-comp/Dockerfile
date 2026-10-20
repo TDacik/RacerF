@@ -8,6 +8,7 @@ RUN apt-get install -y git opam
 RUN opam init --bare --disable-sandboxing
 RUN opam update -y
 
-COPY run_build.sh $HOME/run_build.sh
+WORKDIR /racerf
+COPY run_build.sh ./run_build.sh
 
 ENTRYPOINT ["./run_build.sh"]
