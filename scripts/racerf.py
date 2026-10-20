@@ -133,7 +133,7 @@ class Runner:
     def run_racer(self, source_file, options, args, orig_source_file):
         if args.over_approx:
             options += ["-cc-nondet-assignments"]
-            res = self.run_under_approx(source_file, options, orig_source_file)
+            res = self.run_over_approx(source_file, options, orig_source_file)
             print(res.stdout)
             return self.hotfix_eva_error(res)
         elif args.under_approx:
