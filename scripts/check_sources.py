@@ -5,9 +5,15 @@ from preprocess import preprocess
 
 def check(content):
     for line in content:
-        if not "extern" in line:
+        if not "extern" in line and not "typedef" in line:
             if "sem_wait" in line:
                 print("unsupported: semaphore")
+                exit(10)
+            if "pthread_once" in line:
+                print("unsupported: pthread_once")
+                exit(10)
+            if "barrier_wait" in line:
+                print("unsupported: pthread_barrier")
                 exit(10)
 
 
