@@ -12,7 +12,7 @@ let path_to_string path = Format.asprintf "%a" Frama_c_kernel.Filepath.pretty pa
 let yaml_location loc =
   let pos = fst loc in (* TODO: why fst? *)
   `O [
-    "file",   `String (path_to_string @@ Filepos.path pos);
+    "file",   `String (path_to_string @@ List.hd @@ Core0.OriginalSources.get ()); (* TODO: just hotfix for SV-COMP *)
     "line",   `Float (float_of_int @@ Filepos.line pos);
     (* According to documentation, Frama-C cannot track columns.
     "column", `Float (float_of_int @@ Filepos.column pos); *)
