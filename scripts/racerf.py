@@ -114,6 +114,7 @@ class Runner:
         options = options + [
             "-cc-thread-approx=over",
             "-cc-nondet-assignments",
+            f"-cc-orig-sources={orig_source_file}",
         ]
         return self.run_racer_once(source_file, options)
 
