@@ -20,27 +20,17 @@ class visitor (nondet_fn : Fundec.t) var = object (self)
   inherit Cil.nopCilVisitor
 
   method! vstmt stmt = match stmt.skind with
-    | Instr (Set (lval, exp, loc)) when is_not_local lval ->
-      Core0.debug "Adding line at %d" (Print_utils.stmt_line stmt); 
+    | Instr (Set (lval, _, loc))
+    | Instr (Call (Some lval, _, _, loc)) when is_not_local lval ->
       let init, cond = mk_nondet_bool loc nondet_fn var in
-      let b_then = Cil.mkBlock [Cil.mkStmt ~valid_sid:true ~sattr:[] stmt.skind] in
+      let b_then = Cil.mkBlock [Cil.mkStmt stmt.skind] in
       let b_else = Cil.mkBlock [] in
-      let kind = If (cond, b_then, b_else, loc) in
-      let res = Cil.mkStmt ~valid_sid:true ~sattr:[] kind in
-      let res = {(Cil.mkStmtCfgBlock [init; res]) with labels=stmt.labels} in
+      let nondet_stmt = Cil.mkStmt ~valid_sid:true @@ If (cond, b_then, b_else, loc) in
+      (* We only change the 'skind' of the existing statement. Creating a new
+         statement would break gotos pointing to it. *)
+      stmt.skind <- Block (Cil.mkBlock [init; nondet_stmt]);
       F.must_recompute_cfg (Option.get self#current_func);
-      ChangeTo res
-
-    | Instr (Call (Some lval, fn, args, loc)) when is_not_local lval ->
-      Core0.debug "Adding line at %d" (Print_utils.stmt_line stmt);
-      let init, cond = mk_nondet_bool loc nondet_fn var in
-      let b_then = Cil.mkBlock [Cil.mkStmt ~valid_sid:true ~sattr:[] stmt.skind] in
-      let b_else = Cil.mkBlock [] in
-      let kind = If (cond, b_then, b_else, loc) in
-      let res = Cil.mkStmt ~valid_sid:true ~sattr:[] kind in
-      let res = {(Cil.mkStmtCfgBlock [init; res]) with labels=stmt.labels} in
-      F.must_recompute_cfg (Option.get self#current_func);
-      ChangeTo res
+      Cil.SkipChildren
 
     | _ -> DoChildren
 
