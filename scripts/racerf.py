@@ -11,7 +11,7 @@ import argparse
 
 from subprocess import run, PIPE, STDOUT
 
-from check_sources import check_and_get_sources
+from preprocess import preprocess
 from transformations import transform_under_approx
 
 # SV-COMP mode constants
@@ -177,6 +177,27 @@ class Runner:
                 raise Exception
 
 
+def preprocess_sources(source_files):
+    acc = []
+    for fname in source_files:
+        with open(fname, "r", encoding="latin1") as f:
+            lines = f.readlines()
+        acc.append(preprocess(fname, lines))
+    return acc
+
+
+def get_preprocessed_sources(cmdline):
+    """Splits command line into lists of source files and options."""
+    source_files = []
+    options = []
+    for arg in cmdline:
+        if arg.endswith(".i") or arg.endswith(".c"):
+            source_files.append(arg)
+        else:
+            options.append(arg)
+    return preprocess_sources(source_files), options, source_files
+
+
 def parse_args():
     args = sys.argv[1:]
     is_script_arg = lambda x: x.startswith("--")
@@ -205,7 +226,7 @@ def main():
     if args.version:
         runner.version()
     else:
-        sources, options, orig_sources = check_and_get_sources(racerf_args)
+        sources, options, orig_sources = get_preprocessed_sources(racerf_args)
         if len(sources) != 1:
             print(sources)
             print("Currently, only one source file can be analysed by this wrapper")

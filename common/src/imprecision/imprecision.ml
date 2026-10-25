@@ -2,7 +2,6 @@
  *
  * Author: Tomas Dacik (idacik@fit.vut.cz), 2024 *)
 
-open Cil_types
 open Cil_datatype
 
 type t =
@@ -19,6 +18,11 @@ type t =
   | UnreleasedLock of Kernel_function.t * Lock.t
   | AtomicFnWithBody of Kernel_function.t
 
+  (* Unsupported pthread functions *)
+  | Semaphore
+  | Barrier
+  | PthreadOnce
+
   | Backend of t
 
 let imprecisions = ref ([] : t list)
@@ -29,25 +33,6 @@ let add (source : t) =
 let add_backend (source : t) = () (*add (Backend source)*)
 
 let get_imprecisions () = !imprecisions
-
-let is_active_waiting stmt =
-  let rec check_instructions stmt = match stmt.skind with
-    | If (_, block_else, block_then, _) ->
-      List.for_all check_instructions block_else.bstmts
-      && List.for_all check_instructions block_then.bstmts
-    | Break _ -> true
-    | Block b -> List.for_all check_instructions b.bstmts
-    | _ -> false
-  in
-  match stmt.skind with
-  | Loop (_, block, _, _, _) -> begin match block.bstmts with
-    | stmts -> List.for_all check_instructions stmts
-    end
-  | _ -> false
-
-let check () =
-  let empty_while_loops = CFG_utils.filter_stmts is_active_waiting in
-  List.iter (fun s -> add (ActiveWaiting s)) empty_while_loops
 
 let rec show = function
   | MemAccess (stmt) ->
@@ -78,6 +63,10 @@ let rec show = function
 
   | Backend imprecision ->
     Format.asprintf "%s (not supported by the backend)" (show imprecision)
+
+  | Semaphore -> "Semaphores"
+  | Barrier -> "Barriers"
+  | PthreadOnce -> "Function pthread_once"
 
 let report filter =
   let imprecisions = List.filter filter !imprecisions in

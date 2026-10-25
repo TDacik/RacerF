@@ -4,13 +4,17 @@
 
 open Imprecision
 
-(** TODO: backend imprecisions *)
+(** Return true if the given imprecision may hide a race. *)
+let could_cause_unsoundness = function
+  | Unlock _ | FunctionPointer _ | PthreadOnce | Barrier -> true (* TODO: true for barrier? *)
+  | _ -> false
+
+(** Return true if the given imprecision may introduce a false alarm. *)
+let could_cause_incompleteness = function
+  | FunctionPointer _ | Unlock _ | Backend _ -> false
+  | _ -> true
+
 let run res =
-  let filter =
-    if RaceAnalysis.Result.is_race_free res then
-      (function (FunctionPointer _ | Unlock _) -> true | _ -> false)
-    else if RaceAnalysis.Result.has_must_race res then
-      (function (FunctionPointer _ | Unlock _ | Backend _) -> false | _ -> true)
-    else (function _ -> true)
-   in
-   Imprecision.report filter
+  if RaceAnalysis.Result.is_race_free res
+  then Imprecision.report could_cause_unsoundness
+  else Imprecision.report could_cause_incompleteness

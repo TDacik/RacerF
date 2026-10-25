@@ -34,7 +34,7 @@ let init () =
   (*
   ConcurrencyModel_data.print ();
   (if NonDeterminization.get () then Nondetermizer.run ()); *)
-  Imprecision.check ();
+  ImprecisionDetection.check ();
   let module ValueAnalysis = (val value_analysis ()) in
   ValueAnalysis.check_imprecision ();
   (module ValueAnalysis : VALUE_ANALYSIS)
