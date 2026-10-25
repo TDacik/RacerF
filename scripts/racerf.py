@@ -155,7 +155,7 @@ class Runner:
             print(res2.stdout)
 
             if "[racer] Data race " in res2.stdout:
-                return res2.returncode
+                return self.hotfix_eva_error(res2)
 
             # We need to print this to match our short-sighted defininition of Benchexec's tool info
             print("[SV-wrapper] The result may be imprecise")
