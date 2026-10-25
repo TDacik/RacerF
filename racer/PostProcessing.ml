@@ -6,7 +6,8 @@ open Imprecision
 
 (** Return true if the given imprecision may hide a race. *)
 let could_cause_unsoundness = function
-  | Unlock _ | FunctionPointer _ | PthreadOnce | Barrier -> true (* TODO: true for barrier? *)
+  | Unlock _ | FunctionPointer _ | Semaphore | PthreadOnce | Barrier -> true
+    (* TODO: true for barrier? *)
   | _ -> false
 
 (** Return true if the given imprecision may introduce a false alarm. *)

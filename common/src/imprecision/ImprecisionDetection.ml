@@ -26,6 +26,7 @@ let check_function kf = match Kernel_function.get_name kf with
   | name when List.mem name semaphore_functions -> Imprecision.add Semaphore
   | "barrier_wait" -> Imprecision.add Barrier
   | "pthread_once" -> Imprecision.add PthreadOnce
+  | _ -> ()
 
 let check_functions () =
   Globals.Functions.iter (fun kf ->
@@ -49,5 +50,6 @@ let is_active_waiting stmt =
   | _ -> false
 
 let check () =
+  check_functions ();
   let empty_while_loops = CFG_utils.filter_stmts is_active_waiting in
   List.iter (fun s -> add (ActiveWaiting s)) empty_while_loops

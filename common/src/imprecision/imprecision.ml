@@ -13,7 +13,7 @@ type t =
   | Join of Stmt.t
   | JoinInLoop of Stmt.t
   | ActiveWaiting of Stmt.t
-  | TryLock of string
+  | TryLock of String.t
   | Malloc
   | UnreleasedLock of Kernel_function.t * Lock.t
   | AtomicFnWithBody of Kernel_function.t
@@ -24,11 +24,17 @@ type t =
   | PthreadOnce
 
   | Backend of t
+[@@deriving compare]
 
-let imprecisions = ref ([] : t list)
+module S = Set.Make(struct
+  type nonrec t = t
+  let compare = compare
+end)
+
+let imprecisions = ref S.empty
 
 let add (source : t) =
-  imprecisions := source :: !imprecisions
+  imprecisions := S.add source !imprecisions
 
 let add_backend (source : t) = () (*add (Backend source)*)
 
@@ -69,7 +75,7 @@ let rec show = function
   | PthreadOnce -> "Function pthread_once"
 
 let report filter =
-  let imprecisions = List.filter filter !imprecisions in
-  if imprecisions != [] then
+  let imprecisions = S.filter filter !imprecisions in
+  if not @@ S.is_empty imprecisions then
     let _ = Core0.result "The result may be imprecise, reasons:" in
-    List.iter (fun i -> Core0.result "  - %s" (show i)) imprecisions
+    S.iter (fun i -> Core0.result "  - %s" (show i)) imprecisions
