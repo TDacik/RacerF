@@ -9,6 +9,11 @@ module Callstack = RelaxedCallstack
 module Result = struct
   include ThreadAnalysis0
   let get_threads res = res.thread_graph
+
+  let has_nested_threads res =
+    ThreadGraph.fold_edges (fun parent _ acc ->
+      acc || not @@ Thread.is_main parent
+    ) res.thread_graph false
 end
 
 module Context = struct

@@ -30,6 +30,9 @@ module Result : sig
   val stmt_is_parallel : Stmt.t -> t -> bool
   (** True iff statement can be reached by multiple concrete threads. *)
 
+  val has_nested_threads : t -> bool
+  (** True if the program has a thread created from a thread different from main. *)
+
 end
 
 module Make (_ : VALUE_ANALYSIS) : sig

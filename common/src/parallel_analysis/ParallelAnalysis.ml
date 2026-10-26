@@ -19,6 +19,8 @@ module Context = struct
   let cache = ref C.empty
 
   type t = {
+    input : ThreadAnalysis.Result.t;
+
     active_threads : Thread.Powerset.t;
     is_imprecise : bool;
 
@@ -27,7 +29,8 @@ module Context = struct
     imprecise : bool M.t;
   }
 
-  let empty thread = {
+  let empty input thread = {
+    input = input;
     active_threads = Thread.Powerset.singleton @@ Thread.Set.singleton thread;
     is_imprecise = false;
 
@@ -37,6 +40,8 @@ module Context = struct
   }
 
   let join ctx1 ctx2 = {
+    input = ctx1.input;
+
     active_threads = Thread.Powerset.union ctx1.active_threads ctx2.active_threads;
     is_imprecise = ctx1.is_imprecise || ctx2.is_imprecise;
 
@@ -225,7 +230,7 @@ module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
     Logger.feedback "Starting may-run-in-parallel analysis";
     thread_res := Some threads;
     let thread_graph = ThreadAnalysis.Result.get_threads threads in
-    let ctx0 = Context.empty @@ ThreadGraph.get_main thread_graph in
+    let ctx0 = Context.empty threads @@ ThreadGraph.get_main thread_graph in
 
     let res = ThreadGraph.fold_vertex (fun thread ctx ->
       Logger.debug "> Starting analysis of thread: %a" Thread.pp thread;
@@ -266,12 +271,18 @@ module Result = struct
     let active2 = flatten @@ active_threads res cs2 in
     Thread.Set.mem thread1 active2 && Thread.Set.mem thread2 active1
 
-  let must_run_in_parallel =
-    parallel_aux Thread.Powerset.flatten_inter
+  let must_run_in_parallel res cs1 cs2 =
+    if ThreadAnalysis.Result.has_nested_threads res.input then
+      (* TODO: the following is only hotfix for soundness issue *)
+      false
+    else parallel_aux Thread.Powerset.flatten_inter res cs1 cs2
 
-  let may_run_in_parallel =
-    parallel_aux Thread.Powerset.flatten_union
+  let may_run_in_parallel res cs1 cs2 =
+    if ThreadAnalysis.Result.has_nested_threads res.input then
+      (* TODO: the following is only hotfix for soundness issue *)
+      true
+    else parallel_aux Thread.Powerset.flatten_union res cs1 cs2
 
-  let show = show_stmt_summaries
+  let show res = show_stmt_summaries res
 
 end
