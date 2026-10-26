@@ -24,7 +24,7 @@ let semaphore_functions = [
 let check_function kf = match Kernel_function.get_name kf with
   | name when List.mem name allocation_functions -> Imprecision.add_backend Malloc
   | name when List.mem name semaphore_functions -> Imprecision.add Semaphore
-  | "barrier_wait" -> Imprecision.add Barrier
+  | "pthread_barrier_wait" -> Imprecision.add Barrier
   | "pthread_once" -> Imprecision.add PthreadOnce
   | _ -> ()
 
