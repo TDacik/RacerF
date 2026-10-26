@@ -47,6 +47,7 @@ translation = [
     ("_Atomic long long int", "atomic_intmax_t"),
     ("_Atomic long long unsigned int", "atomic_uintmax_t"),
     ("__float128", "float"),
+    ("__alignof(", "__alignof__("),
 ]
 
 
