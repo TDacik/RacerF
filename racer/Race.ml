@@ -105,7 +105,7 @@ let check_must_race threads parallel self other =
     Option.some @@ of_accesses Must self other
   else
     let _ = Racer.debug ">>> Verdict: may\n" in
-    let reason1 = if are_precise then None else Some "not precise" in
+    let reason1 = if are_precise then None else Some "not precise access" in
     let reason2 = if is_unique then None else Some "not unique access" in
     let reason3 = if not_weak then None else Some "weak" in
     let reason4 = if are_parallel then None else Some "not parallel" in
@@ -127,24 +127,23 @@ let show_kind = function
 
 let show_reason race = match race.kind with
   | Must -> ""
-  | May reason -> "Reason: " ^ reason
+  | May reason -> "\n  Not-must reason: " ^ reason ^ "\n"
 
 let show race =
   if Int_Intervals.is_top race.offset then
-    Format.asprintf "Data race (%s) on %a\n%s"
+    Format.asprintf "Data race (%s) on %a"
       (show_kind race.kind)
       Base.pretty race.base
-      (show_reason race)
   else
-    Format.asprintf "Data race (%s) on %a at offset %a\n%s"
+    Format.asprintf "Data race (%s) on %a at offset %a"
       (show_kind race.kind)
       Base.pretty race.base
       Int_Intervals.pretty race.offset
-      (show_reason race)
 
 let report race =
   let a1, a2 = race.accesses in
-  Format.asprintf "%s:\n    %s\n\n    %s"
+  Format.asprintf "%s:%s\n    %s\n\n    %s"
     (show race)
+    (show_reason race)
     (Callstack.show ~event:(MemoryAccess.show_kind a1.kind) a1.callstack)
     (Callstack.show ~event:(MemoryAccess.show_kind a2.kind) a2.callstack)
