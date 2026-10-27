@@ -11,9 +11,9 @@ open ConcurrencyModel_data
 open ConcurrencyModel_types
 
 type call_type =
-  | Direct of Kernel_function.t (* Function defined in the source code *)
-  | Extern of Varinfo.t         (* Extern function without definition *)
-  | Pointer of Exp.t    (* Call via a function pointer *)
+  | Direct of Kernel_function.t (* Function defined/declared in the source code *)
+  | Extern of Varinfo.t         (* Extern function without declaration *)
+  | Pointer of Exp.t            (* Call via a function pointer *)
 
 type stmt =
   | Lock of Exp.t * LockKind.t * Lval.t option
@@ -79,15 +79,12 @@ let classify_call ?lval fn args =
   else if AtomicSequenceEnd.mem fn_name then
     Atomic_seq_end
 
-  (** Needs to be after sequences!
-  else if AtomicFunctions.exists (fun a -> Str.string_match (Str.regexp a) fn_name 0) then
-    Atomic_call (fn, args)
-  *)
-
   else
     let call_type = match fn with
       | Var var ->
-        (try let kf = Globals.Functions.get var in Direct kf
+        (try
+          let kf = Globals.Functions.get var in
+          Direct kf
         with Not_found -> Extern var)
       | Mem expr -> Pointer expr
     in
@@ -114,5 +111,6 @@ let classify_stmt stmt = match stmt.skind with
 let get_thread_arg stmt = match classify_stmt stmt with
   | Thread_create (_, _, arg) -> arg
 
-let is_atomic_fn var =
-  AtomicFunctions.exists (fun a -> Str.string_match (Str.regexp a) var.vname 0)
+let is_atomic_fn kf =
+  let name = Kernel_function.get_name kf in
+  AtomicFunctions.exists (fun a -> Str.string_match (Str.regexp a) name 0)

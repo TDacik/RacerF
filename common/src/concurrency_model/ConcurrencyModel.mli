@@ -40,4 +40,4 @@ val classify_stmt : Stmt.t -> stmt
 
 val get_thread_arg : Stmt.t -> Exp.t
 
-val is_atomic_fn : Varinfo.t -> bool
+val is_atomic_fn : Kernel_function.t -> bool
