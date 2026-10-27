@@ -97,7 +97,7 @@ class Runner:
             "-racer",
             "-cc-profile",
             "-cc-stats",
-            "-racer-witness-path=witness.graphml",
+            "-racer-witness-path=witness.yml",
             *silent_kernel,
             *options,
             *default,

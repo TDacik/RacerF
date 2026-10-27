@@ -69,7 +69,7 @@ let final_waypoint n stmt : Yaml.value =
   `O  [
         ("type",      `String "target");
         ("action",    `String "follow");
-        ("thread_id", `Float (Float.of_int n));
+        (*"thread_id", `Float (Float.of_int n));*)
         ("location",  `O (yaml_location stmt));
   ]
 
@@ -87,8 +87,8 @@ let yaml_race race : Yaml.value list =
   let t1, t2 = Race.get_threads race in
   let stmt1, stmt2 = Race.get_stmts race in
   [
-    segment [waypoint @@ thread_entry t1];
-    segment [waypoint @@ thread_entry t2];
+    (*segment [waypoint @@ thread_entry t1];
+    segment [waypoint @@ thread_entry t2];*)
     segment @@ final stmt1 stmt2;
   ]
 
@@ -109,10 +109,8 @@ let mk_yaml race =
   witness ~uuid ~time race metadata
 
 let dump_trace race filepath =
-  try
-    let file = Format.asprintf "%a" Frama_c_kernel.Filepath.pretty_abs filepath in
-    let channel = open_out_gen [Open_creat; Open_trunc; Open_wronly] 0o666 file in
-    let yaml = mk_yaml race in
-    Out_channel.output_string channel (Yaml.to_string_exn yaml);
-    close_out channel
-  with _ -> ()
+  let file = Format.asprintf "%a" Frama_c_kernel.Filepath.pretty_abs filepath in
+  let channel = open_out_gen [Open_creat; Open_trunc; Open_wronly] 0o666 file in
+  let yaml = mk_yaml race in
+  Out_channel.output_string channel (Yaml.to_string_exn yaml);
+  close_out channel
