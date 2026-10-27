@@ -26,6 +26,8 @@ let check_function kf = match Kernel_function.get_name kf with
   | name when List.mem name semaphore_functions -> Imprecision.add Semaphore
   | "pthread_barrier_wait" -> Imprecision.add Barrier
   | "pthread_once" -> Imprecision.add PthreadOnce
+  | _ when ConcurrencyModel.is_atomic_fn kf && Kernel_function.has_definition kf ->
+    Imprecision.add (AtomicFnWithBody kf)
   | _ -> ()
 
 let check_functions () =
