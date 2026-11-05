@@ -7,7 +7,7 @@ import argparse
 from pathlib import Path
 from dataclasses import dataclass
 
-from subprocess import run, PIPE, TimeoutExpired
+from subprocess import run, PIPE, STDOUT, TimeoutExpired
 
 BENCHMARKS = "benchmarks/data_races"
 
@@ -98,13 +98,14 @@ class TestCase:
         return True
 
 class Runner:
-    def __init__(self, debug=False, timeout=10):
+    def __init__(self, debug=False, print_errors=False, timeout=10):
         self.debug = debug
+        self.print_errors = print_errors
         self.timeout = timeout
         self.all_correct = True
 
     def read_verdict(self, res):
-        stdout = res.stdout.decode().strip()
+        stdout = res.stdout.strip()
         if "The result may be imprecise" in stdout:
             return None
         if "Data race (must)" in stdout:
@@ -118,12 +119,12 @@ class Runner:
         if res.returncode != 0:
             print_err(f"{test_case.name}: error")
             self.all_correct = False
-            return
+            return False
 
         verdict = self.read_verdict(res)
         res = test_case.check_verdict(verdict)
         self.all_correct = self.all_correct and res
-        return
+        return res
 
     def run(self, test_case):
         if self.debug:
@@ -135,8 +136,12 @@ class Runner:
             print_debug(" ".join(command))
 
         try:
-            res = run(command, timeout=self.timeout, stdout=PIPE, stderr=PIPE)
-            return self.check_verdict(test_case, res)
+            res = run(command, timeout=self.timeout, stdout=PIPE, stderr=STDOUT, text=True)
+            verdict = self.check_verdict(test_case, res)
+
+            if self.debug or (self.print_errors and not verdict):
+                print_debug(res.stdout)
+
         except TimeoutExpired:
             print_warning(f"{self.name}: timeout")
 
@@ -156,7 +161,11 @@ class Runner:
 
 
 def main():
-    runner = Runner()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--print-errors", action="store_true")
+    args = parser.parse_args()
+    runner = Runner(debug=args.debug, print_errors=args.print_errors)
     return runner.run_all()
 
 if __name__ == "__main__":

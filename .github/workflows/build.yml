@@ -22,4 +22,4 @@ jobs:
         run: opam exec -- dune build
 
       - name: Regression tests
-        run: python3 scripts/tests/run_races.py
+        run: python3 scripts/tests/run_races.py --print-errors
