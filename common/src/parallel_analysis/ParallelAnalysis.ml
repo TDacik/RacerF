@@ -182,7 +182,7 @@ module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
       let _ = Context.cache := C.add (callstack, ctx.active_threads) !Context.cache in
       let ctx' = match ConcurrencyModel.classify_stmt stmt with
         | Thread_create (id, children, arg) -> update_on_create ctx stmt id children arg
-        | Thread_join id -> update_on_join ctx stmt id
+        | Thread_join (id, _) -> update_on_join ctx stmt id
         | Call (_, _, fn, _) -> update_on_call ctx stmt fn
         | _ -> ctx
       in

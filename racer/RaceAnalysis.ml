@@ -236,7 +236,7 @@ module Make (ValueAnalysis : VALUE_ANALYSIS) = struct
     Result.update_writes stmt ctx.callstack lss res' writes
 
   let rec update_on_call ctx res stmt typ lval fn args = match typ with
-    | Direct kf when ConcurrencyModel.is_atomic_fn kf && not @@ Kernel_function.has_definition kf ->
+    | Direct kf when ConcurrencyModel.is_atomic_kf kf && not @@ Kernel_function.has_definition kf ->
       res (* Skip external atomic functions *)
     | _ ->
       let writes1 = match lval with

@@ -167,7 +167,7 @@ module Make (ValueAnalysis : VALUE_ANALYSIS) = struct
       let ctx', res' = match ConcurrencyModel.classify_stmt stmt with
         | Thread_create (tid, entry_point, arg) -> update_on_create ctx res stmt tid entry_point arg
         | Call (_, _, callee, _) -> update_on_call ctx res stmt callee
-        | Thread_join tid -> update_on_join ctx res stmt tid
+        | Thread_join (tid, _) -> update_on_join ctx res stmt tid
         | _ -> ctx, update_on_noop res stmt ctx
       in
       let _ = Logger.debug ~level:4 ">     ~> %s" (Thread.Set.show ctx'.active_threads) in
