@@ -9,7 +9,6 @@
  * Author: Tomas Dacik (idacik@fit.vut.cz), 2024 *)
 
 open Cil_types
-open Cil_datatype
 open Base
 
 module Logger = Core0.Logger(struct let dkey = "base-utils" end)
@@ -32,15 +31,6 @@ let is_thread_arg thread = function
   | Var (var, _) -> Kernel_function.is_formal var @@ Thread.get_entry_point thread
   | _ -> false
 
-(** We cannot use the _Atomic attribute which is erased during preprocessing. We need to
-    rely on encoding in the type name, e.g., atomic_int. *)
-let is_atomic = function
-  | Var (var, _) | Allocated (var, _, _) ->
-    let typ = match var.vtype.tnode with TPtr t -> t | _ -> var.vtype in
-    let type_name = Format.asprintf "%a" Typ.pretty typ in
-    String.starts_with ~prefix:"atomic_" type_name
-  | _ -> false
-
 let is_thread_local base =
   match base with
     | Var (var, _) -> Ast_attributes.contains "thread" var.vattr
@@ -51,10 +41,8 @@ let is_thread_local base =
       end
     | _ -> false
 
-
 let keep_for_racer thread base =
   let not_ghost = not @@ is_ghost base in
-  let not_atomic = not @@ is_atomic base in
   let not_thread_local = not @@ is_thread_local base in
   let may_escape = EscapeAnalysis.may_escape base in
   let global = Frama_c_kernel.Base.is_global base in
@@ -62,7 +50,6 @@ let keep_for_racer thread base =
   let res =
     (is_interesting base)
     && not_ghost
-    && not_atomic
     && (not_thread_local || may_escape)
     && (global || thread_arg || may_escape)
   in
@@ -71,7 +58,6 @@ let keep_for_racer thread base =
   Logger.debug ~level:5 " >    Thread arg: %b" thread_arg;
   Logger.debug ~level:5 " >    May escape: %b" may_escape;
   Logger.debug ~level:5 " >    Not ghost: %b" not_ghost;
-  Logger.debug ~level:5 " >    Not atomic: %b" not_atomic;
   Logger.debug ~level:5 " >    Not thread local: %b" not_thread_local;
   Logger.debug ~level:5 " >>>> Verdict: %b\n" res;
   res

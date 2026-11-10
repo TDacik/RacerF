@@ -17,6 +17,7 @@ type t =
   | Malloc
   | UnreleasedLock of Kernel_function.t * Lock.t
   | AtomicFnWithBody of Kernel_function.t
+  | AtomicAttr of Base.t
 
   (* Unsupported pthread functions *)
   | Semaphore
@@ -66,6 +67,8 @@ let rec show = function
       Kernel_function.pretty kf Lock.pp lock
   | AtomicFnWithBody kf ->
     Format.asprintf "Atomic function with implementation %a" Kernel_function.pretty kf
+  | AtomicAttr base ->
+    Format.asprintf "Unsupported granulatiry of _Atomic: %a" Base.pretty base
 
   | Backend imprecision ->
     Format.asprintf "%s (not supported by the backend)" (show imprecision)

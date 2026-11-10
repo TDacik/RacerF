@@ -122,13 +122,6 @@ module Self = struct
         ) loc []
         *)
 
-  let concretise_zone zone =
-    try Memory_zone.fold_i (fun base offsets acc ->
-      if Int_Intervals.is_top offsets then acc
-      else (base, offsets) :: acc
-    ) zone []
-    with Abstract_interp.Error_Top -> []
-
   let cs_pred cs eva_cs = match cs with
     | None -> true
     | Some cs -> Callstack.match_with_eva cs eva_cs
@@ -171,7 +164,7 @@ module Self = struct
 
   let get_accesses with_locals zone =
     let thread = get_active_thread () in
-    concretise_zone zone
+    ZoneUtils.concretise_zone zone
     |> List.filter (fun (base, _) -> BaseUtils.keep_for_racer thread base)
     |> List.filter (fun (base, _) -> not @@ BaseUtils.is_thread_arg thread base)
        (** TODO: Revisit this for other backends *)

@@ -54,4 +54,6 @@ let run () =
   else if Racer.Enabled.get () then main ()
   else ()
 
-let () = Boot.Main.extend run
+let () =
+  Ast_attributes.register ~ignore:true Ast_attributes.AttrType Constants.racerf_atomic_attr;
+  Boot.Main.extend run
