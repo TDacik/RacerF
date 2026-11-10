@@ -10,8 +10,6 @@ module Result : sig
 
   type t
 
-  val active_threads: t -> Callstack.t -> Thread.Powerset.t
-
   val may_active_threads : t -> Callstack.t -> Thread.Set.t
 
   val must_active_threads : t -> Callstack.t -> Thread.Set.t

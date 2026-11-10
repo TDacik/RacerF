@@ -6,6 +6,8 @@ module Result : sig
 
   type t = ThreadAnalysis0.t
 
+  val get_main : t -> Thread.t
+
   val is_thread : t -> Kernel_function.t -> bool
   (** Checks whether a kernel function is an entry point of some thread. *)
 

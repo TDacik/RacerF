@@ -1,127 +1,96 @@
 (* May-run-in-parallel analysis.
  *
- * Computation of sets of sets of threads which may run in parallel at given stmt.
- *
  * Author: Tomas Dacik (idacik@fit.vut.cz), 2024 *)
 
 open Cil_types
 
-module Logger = Core0.Logger(struct let dkey = "pr" end)
+module Logger = Core0.Logger(struct let dkey = "may-run-in-parallel" end)
 module Callstack = RelaxedCallstack
 
-module M = Map.Make(Callstack)
-module C = Set.Make(struct
-  type t = Callstack.t * Thread.Powerset.t [@@deriving equal, compare]
+
+module Domain = struct
+  include MustMay.Make(Thread)
+  let may_run t dom = is_may dom t
+  let must_run t dom = is_must dom t
+end
+
+module VisitedCache = Set.Make(struct
+  type t = Callstack.t * Domain.t [@@deriving equal, compare]
 end)
 
 module Context = struct
-
-  let cache = ref C.empty
+  module M = Map.Make(Callstack)
 
   type t = {
+    (* Read-only input data *)
     input : ThreadAnalysis.Result.t;
 
-    active_threads : Thread.Powerset.t;
-    is_imprecise : bool;
-
+    (* Analysis state *)
     callstack : Callstack.t;
-    results : Thread.Powerset.t M.t;
-    imprecise : bool M.t;
+    visited : VisitedCache.t;
+
+    (* Computed results *)
+    results: Domain.t M.t;
   }
 
-  let empty input thread = {
-    input = input;
-    active_threads = Thread.Powerset.singleton @@ Thread.Set.singleton thread;
-    is_imprecise = false;
+  let equal ctx1 ctx2 =
+    M.equal Domain.equal ctx1.results ctx2.results
 
-    callstack = Callstack.empty thread;
-    results = M.empty;
-    imprecise = M.empty;
-  }
+  let init threads =
+    let main = ThreadAnalysis.Result.get_main threads in
+    {
+      input = threads;
+      callstack = Callstack.empty main;
+      visited = VisitedCache.empty;
+      results = M.empty;
+    }
 
-  let join ctx1 ctx2 = {
-    input = ctx1.input;
-
-    active_threads = Thread.Powerset.union ctx1.active_threads ctx2.active_threads;
-    is_imprecise = ctx1.is_imprecise || ctx2.is_imprecise;
-
-    callstack = ctx1.callstack;
-    results =
-      M.union (fun _ ps1 ps2 -> Some (Thread.Powerset.union ps1 ps2)) ctx1.results ctx2.results;
-    imprecise = M.union (fun _ c1 c2 -> Some (c1 || c2)) ctx1.imprecise ctx2.imprecise;
-  }
-
-  let set_imprecise ctx = {ctx with is_imprecise = true}
-
-  let compute_initial ctx parent thread =
-    M.fold (fun cs threads acc ->
-      let parent' = Callstack.get_thread cs in
-      if not @@ Thread.equal parent parent' then acc
-      else
-        let xs = Thread.Powerset.filter (fun set -> Thread.Set.mem thread set) threads in
-        Thread.Set.union acc (Thread.Powerset.flatten_union xs)
-    ) ctx.results Thread.Set.empty
-
-  (** Callstack updates *)
+  let set_thread ctx thread = {ctx with callstack = Callstack.empty thread}
 
   let push_call ctx stmt fn = {ctx with callstack = Callstack.push stmt fn ctx.callstack}
 
   let pop_call ctx = {ctx with callstack = Callstack.pop_call ctx.callstack}
 
+  let was_visited ctx stmt state =
+    let cs = Callstack.push_event stmt ctx.callstack in
+    VisitedCache.mem (cs, state) ctx.visited
 
-  let update fn ctx = {ctx with active_threads = fn ctx.active_threads}
+  let add_visited ctx stmt state =
+    let cs = Callstack.push_event stmt ctx.callstack in
+    {ctx with visited = VisitedCache.add (cs, state) ctx.visited}
 
-  let reset ctx thread active =
-    {ctx with
-      active_threads = active;
-      is_imprecise = false;
-      callstack = Callstack.empty thread
-    }
+  let add_stmt_summary ctx stmt state =
+    let cs = Callstack.push_event stmt ctx.callstack in
+    {ctx with results = M.update cs (function None -> Some state | Some old -> Option.some @@ Domain.join old state) ctx.results}
 
-  (** Updates of summaries *)
+  (** True if in some callstack: t1 must run && t2 must run. *)
+  let must_run_with ctx t1 t2 =
+    M.exists (fun cs res -> Domain.must_run res t1 && Domain.must_run res t2) ctx.results
 
-  let mk_stmt_summary ctx stmt =
-    let callstack = Callstack.push_event stmt ctx.callstack in
-    {ctx with
-      results = M.add callstack ctx.active_threads ctx.results;
-      imprecise = M.add callstack ctx.is_imprecise ctx.imprecise
-    }
+  (** True if in some callstack: t1 may run && t2 may run. *)
+  let may_run_with ctx t1 t2 =
+    M.exists (fun cs res -> Domain.may_run res t1 && Domain.may_run res t2) ctx.results
 
-  let show_stmt_summaries ctx =
-    M.fold (fun cs threads acc ->
-      Format.asprintf "%s\n\t (%s) ↦  %a (precise: %b)"
-        acc
-        (Callstack.show_short cs)
-        Thread.Powerset.pp threads
-        (M.find cs ctx.imprecise)
-    ) ctx.results ""
+  (** Compute initial state for a thread different from main based on the current results. *)
+  let compute_initial_t ctx self =
+    let thread_graph = ThreadAnalysis.Result.get_threads ctx.input in
+    ThreadGraph.fold_vertex (fun t acc ->
+      if Thread.is_main t || Thread.equal t self then Domain.set_must acc t
+      else if must_run_with ctx self t then Domain.set_must acc t
+      else if may_run_with ctx self t then Domain.set_may acc t
+      else acc
+    ) thread_graph Domain.empty
 
-  let cache_find ctx stmt =
-    let callstack = Callstack.push_event stmt ctx.callstack in
-    if C.mem (callstack, ctx.active_threads) !cache then ctx
-    else raise Not_found
+  let compute_initial ctx self =
+    if Thread.is_main self then Domain.singleton self
+    else compute_initial_t ctx self
 
-  (** Function summaries
+  let show self =
+    M.bindings self.results
+    |> List.map (fun (cs, res) -> Format.asprintf "%s: %s" (Callstack.show_short cs) (Domain.show res))
+    |> String.concat "\n"
 
-  let show_fn_summaries ctx =
-    FunctionSummaries.fold (fun (cs, fn, active) post acc ->
-      Format.asprintf "%s\n\t (%s, %a, %a) ↦  %a"
-        acc
-        (Callstack.show_short cs)
-        Kernel_function.pretty fn
-        Thread.Powerset.pp active
-        Thread.Powerset.pp post
-    ) !fn_cache "=========================================\n\nSummary:\n"
-
-  let add_fn_summary ctx fn res =
-    fn_cache := FunctionSummaries.add (ctx.callstack, fn, ctx.active_threads) res !fn_cache
-
-  let find_fn_summary ctx fn =
-    Core0.feedback "%s" (show_fn_summaries ctx);
-    {ctx with
-      active_threads = FunctionSummaries.find (ctx.callstack, fn, ctx.active_threads) !fn_cache}
-
-  *)
+  let pp fmt self = Format.fprintf fmt "%s" (show self)
 
 end
 
@@ -129,160 +98,130 @@ open Context
 
 module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
 
-  let thread_res = ref (None : ThreadAnalysis.Result.t option)
+  let update_on_create ctx state stmt id children arg =
+    (* TODO: Could this be done better using information computed in thread analysis? *)
+    let children =
+      ValueAnalysis.eval_fn_pointer stmt children
+      |> List.map (Thread.mk ~stmt)
+    in
+    match children with
+    | [t] -> Domain.set_must state t
+    | ts -> Domain.set_may_list state ts
 
-  (** Compute initial powerset for a thread different than main. *)
-  let compute_initial ctx thread_graph thread =
-    if Thread.is_main thread then
-      Thread.Powerset.singleton @@ Thread.Set.singleton thread
-    else
-      let parents = ThreadGraph.pred thread_graph thread in
-      List.fold_left (fun acc parent ->
-        let active = Context.compute_initial ctx parent thread in
-        Thread.Powerset.add active acc
-      ) Thread.Powerset.empty parents
-
-  let update_on_create ctx stmt id children arg =
-    let children = ValueAnalysis.eval_fn_pointer stmt children in
-    let children = List.map (Thread.mk ~stmt) children in
-    Context.update (fun active ->
-      Thread.Powerset.concat_map (fun set ->
-        Thread.Powerset.of_list @@ List.map (fun t ->
-          Thread.Set.add t set
-        ) children
-      ) active
-    ) ctx
-
-  let update_on_join ctx stmt id =
+  let update_on_join ctx state stmt id =
     let kf = Kernel_function.find_englobing_kf stmt in
-    if Kernel_function.stmt_in_loop kf stmt then Context.set_imprecise ctx
-    else
-      let id' = match id.enode with
-        | Lval lval -> Cil.mkAddrOf ~loc:id.eloc lval
-        | _ -> failwith "TODO: join id"
-      in
-      match ThreadAnalysis.Result.find_by_id_opt (Option.get !thread_res) id' with
-        | None -> Context.set_imprecise ctx
-        | Some thread ->
-          Context.update (fun active ->
-            Thread.Powerset.map (fun set -> Thread.Set.remove thread set) active
-          ) ctx
+    let dont_know_fallback () =
+      Imprecision.add (Join stmt);
+      state
+    in
+    (** We cannot handle joining of threads in loops *)
+    if Kernel_function.stmt_in_loop kf stmt
+    then (Imprecision.add (JoinInLoop stmt); state)
+    else match id.enode with
+      | Lval lval -> (
+        let id = Cil.mkAddrOf ~loc:id.eloc lval in
+        match ThreadAnalysis.Result.find_by_id_opt ctx.input id with
+        | Some thread -> Domain.set_must_not state thread
+        | None -> dont_know_fallback ()
+      )
+      | _ -> dont_know_fallback ()
 
-  let rec update_on_call ctx callsite expr =
+  let rec compute_stmt ctx state stmt =
+    if Context.was_visited ctx stmt state then None
+    else (
+      let ctx = Context.add_visited ctx stmt state in
+      let ctx', state' = match ConcurrencyModel.classify_stmt stmt with
+        | Thread_create (id, children, arg) -> ctx, update_on_create ctx state stmt id children arg
+        | Thread_join (id, _) -> ctx, update_on_join ctx state stmt id
+        | Call (_, _, fn, _) -> compute_call ctx state stmt fn
+        | _ -> ctx, state
+      in
+      let ctx'' = Context.add_stmt_summary ctx' stmt state' in
+      List.fold_left (fun (acc_ctx, acc_state) succ ->
+        match compute_stmt acc_ctx acc_state succ with
+        | None -> (acc_ctx, acc_state)
+        | Some (ctx_s, state_s) -> ctx_s, Domain.join state_s acc_state
+      ) (ctx'', state') stmt.succs
+      |> Option.some
+    )
+
+  and compute_call ctx state callsite expr =
     let callees = ValueAnalysis.eval_call callsite expr in
-    List.fold_left (fun acc callee ->
-      let ctx' = compute_function ctx callee callsite in
-      Context.join acc ctx'
-    ) ctx callees
+    List.fold_left (fun (acc_ctx, acc_state) callee ->
+      let ctx' = Context.push_call ctx callsite callee in
+      let ctx_s, state_s = compute_function ctx' acc_state callee in
+      Context.pop_call ctx_s, Domain.join state_s acc_state
+    ) (ctx, state) callees
 
-  and compute_stmt ctx stmt =
-    try Context.cache_find ctx stmt
-    with Not_found ->
-      let callstack = Callstack.push_event stmt ctx.callstack in
-      let _ = Context.cache := C.add (callstack, ctx.active_threads) !Context.cache in
-      let ctx' = match ConcurrencyModel.classify_stmt stmt with
-        | Thread_create (id, children, arg) -> update_on_create ctx stmt id children arg
-        | Thread_join (id, _) -> update_on_join ctx stmt id
-        | Call (_, _, fn, _) -> update_on_call ctx stmt fn
-        | _ -> ctx
-      in
-      let succs = match stmt.skind with
-        (*| If (e, then_b, else_b, _) ->
-          let v = ValueAnalysis.eval_expr ~callstack:ctx.callstack stmt e in
-          if not @@ Cvalue.V.contains_zero v then [List.nth stmt.succs 0]
-          else if not @@ Cvalue.V.contains_non_zero v then [List.nth stmt.succs 1]
-          else stmt.succs*)
-        | _ -> stmt.succs
-      in
-      let ctx'' = Context.mk_stmt_summary ctx' stmt in
-      List.fold_left (fun acc succ ->
-        let ctx' = compute_stmt ctx'' succ in
-        Context.join acc ctx'
-      ) ctx'' succs
-
-  and compute_function ctx fn stmt =
-    if not @@ Kernel_function.has_definition fn then ctx
-    else(* try
-      let ctx = Context.find_fn_summary ctx fn in
-      Core0.feedback "Cache hit";
-      ctx
-    with Not_found ->*)
-      let _ = Core0.debug "Computing fn %a with %d"
-        Kernel_function.pretty fn
-        (Thread.Powerset.cardinal ctx.active_threads)
-      in
-      let ctx' = Context.push_call ctx stmt fn in
+  and compute_function ctx state fn =
+    if not @@ Kernel_function.has_definition fn then ctx, state
+    else
+      let _ = Core0.debug "Computing fn %a" Kernel_function.pretty fn in
       let stmt = Kernel_function.find_first_stmt fn in
-      let ctx'' = compute_stmt ctx' stmt in
-      (*Context.add_fn_summary ctx' fn ctx''.active_threads;*)
-      Context.pop_call ctx''
+      match compute_stmt ctx state stmt with
+      | None -> ctx, state
+      | Some res -> res
 
   let compute_thread ctx thread_graph thread =
     let entry_point = Thread.get_entry_point thread in
-    let active = compute_initial ctx thread_graph thread in
-    let ctx' = Context.reset ctx thread active in
+    let ctx = Context.set_thread ctx thread in
+    let state = Context.compute_initial ctx thread in
     let stmt = Kernel_function.find_first_stmt entry_point in
-    Logger.debug "Computing for thread %s with %s"
-      (Thread.show thread) (Thread.Powerset.show ctx'.active_threads);
-    compute_stmt ctx' stmt
+    Logger.debug "Computing for thread %s with %s" (Thread.show thread) (Domain.show state);
+    match compute_stmt ctx state stmt with
+    | None -> ctx
+    | Some (ctx, _) -> ctx
 
-  let compute threads =
-    Logger.feedback "Starting may-run-in-parallel analysis";
-    thread_res := Some threads;
-    let thread_graph = ThreadAnalysis.Result.get_threads threads in
-    let ctx0 = Context.empty threads @@ ThreadGraph.get_main thread_graph in
-
-    let res = ThreadGraph.fold_vertex (fun thread ctx ->
+  let compute_step ctx =
+    let thread_graph = ThreadAnalysis.Result.get_threads ctx.input in
+    ThreadGraph.fold_vertex (fun thread ctx ->
       Logger.debug "> Starting analysis of thread: %a" Thread.pp thread;
       ValueAnalysis.set_active_thread thread;
       compute_thread ctx thread_graph thread
-    ) thread_graph ctx0
-    in
+    ) thread_graph ctx
 
+  let rec compute_until_fixpoint =
+    let iteration = ref 0 in
+    fun ctx ->
+      incr iteration;
+      Logger.feedback "> iteration %d" !iteration;
+      let ctx' = compute_step ctx in
+      if Context.equal ctx ctx' then ctx
+      else compute_until_fixpoint ctx'
+
+  let compute threads =
+    Logger.feedback "Starting may-run-in-parallel analysis";
+    let ctx0 = Context.init threads in
+    let res = compute_until_fixpoint ctx0 in
     Logger.feedback "May-run-in-parallel analysis finished";
-    (*Logger.debug "%s" (Context.show_stmt_summaries res);*)
-
+    Logger.debug "%a" Context.pp res;
     res
 
 end
 
-(** Access to compute results *)
-
+(** Expose context as results of the analysis. *)
 module Result = struct
   include Context
 
-  let active_threads res cs = M.find cs res.results
-
-  let may_active_threads res cs = Thread.Powerset.flatten_union @@ M.find cs res.results
-
-  let must_active_threads res cs = Thread.Powerset.flatten_inter @@ M.find cs res.results
+  let may_active_threads res cs = Thread.Set.of_list @@ Domain.may_set @@ M.find cs res.results
+  let must_active_threads res cs = Thread.Set.of_list @@ Domain.must_set @@ M.find cs res.results
 
   let may_active_stmt res stmt =
     let open Cil_datatype in
     let open Callstack in
-    M.to_list res.results
+    M.bindings res.results
     |> List.filter (fun (cs, _) -> Stmt.equal (Option.get cs.event) stmt)
-    |> List.fold_left (fun acc (_, res) -> Thread.Set.union acc @@ Thread.Powerset.flatten_union res) Thread.Set.empty
+    |> List.fold_left (fun acc (_, res) -> Domain.may_set res @ acc) []
+    |> Thread.Set.of_list
 
-  let parallel_aux flatten res cs1 cs2 =
-    let thread1 = Callstack.get_thread cs1 in
-    let thread2 = Callstack.get_thread cs2 in
-    let active1 = flatten @@ active_threads res cs1 in
-    let active2 = flatten @@ active_threads res cs2 in
-    Thread.Set.mem thread1 active2 && Thread.Set.mem thread2 active1
+  let parallel_aux get_fn res cs1 cs2 =
+    let t1 = Callstack.get_thread cs1 in
+    let t2 = Callstack.get_thread cs2 in
+    let set1 = get_fn res cs1 in
+    let set2 = get_fn res cs2 in
+    Thread.Set.mem t1 set2 && Thread.Set.mem t2 set1
 
-  let must_run_in_parallel res cs1 cs2 =
-    if ThreadAnalysis.Result.has_nested_threads res.input then
-      (* TODO: the following is only hotfix for soundness issue *)
-      false
-    else parallel_aux Thread.Powerset.flatten_inter res cs1 cs2
-
-  let may_run_in_parallel res cs1 cs2 =
-    if ThreadAnalysis.Result.has_nested_threads res.input then
-      (* TODO: the following is only hotfix for soundness issue *)
-      true
-    else parallel_aux Thread.Powerset.flatten_union res cs1 cs2
-
-  let show res = show_stmt_summaries res
+  let must_run_in_parallel = parallel_aux must_active_threads
+  let may_run_in_parallel = parallel_aux may_active_threads
 
 end
