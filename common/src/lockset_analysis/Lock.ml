@@ -35,6 +35,8 @@ let is_write lock = not @@ is_read lock
 let is_blocking lock = lock.kind.blocking
 let is_reentrant lock = lock.kind.reentrant
 
+let is_local lock = Base.is_any_local lock.base
+
 let get_callstack lock = Option.get lock.callstack
 
 let compare lock1 lock2 =
@@ -85,6 +87,7 @@ module Set = struct
       exists (fun l2 ->
         Lock.equal l1 l2
         && (is_write l1 || is_write l2)
+        && (not @@ is_local l1)
       ) ls2
     ) ls1
 

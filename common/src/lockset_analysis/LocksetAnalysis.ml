@@ -189,12 +189,16 @@ module Make (ValueAnalysis : VALUE_ANALYSIS) = struct
   open Result
   open Context
 
+  let check_lock_values stmt expr values =
+    let is_escaping_local (b, _) = Base.is_any_local b && EscapeAnalysis.may_escape b in
+    if values = [] then Imprecision.add (Lock (stmt, expr))
+    else match List.find_opt is_escaping_local values with
+      | Some (b, _) -> Imprecision.add (EscapingLocalLock (Base.to_varinfo b))
+      | None -> ()
+
   let rec update_on_lock ctx res stmt expr kind status =
     let lock_values = ValueAnalysis.eval_expr_concretised ~callstack:ctx.callstack stmt expr in
-
-    (if lock_values = [] then
-      Imprecision.add (Lock (stmt, expr));
-    );
+    check_lock_values stmt expr lock_values;
 
     let callstack = Callstack.push_event stmt ctx.callstack in
 
@@ -270,7 +274,7 @@ module Make (ValueAnalysis : VALUE_ANALYSIS) = struct
      let lss, res' = match ConcurrencyModel.classify_stmt stmt with
         | Lock (lock, kind, status) -> update_on_lock ctx res stmt lock kind status
         | Unlock lock -> update_on_unlock ctx res stmt lock
-        | Call (Direct kf, _, callee, _) when ConcurrencyModel.is_atomic_fn kf ->
+        | Call (Direct kf, _, callee, _) when ConcurrencyModel.is_atomic_kf kf ->
           let lockset = Lock.Set.add (Lock.global_lock ()) ctx.lockset in
           update_on_call ~atomic:true {ctx with lockset} res stmt callee
         | Call (_, _, callee, _) -> update_on_call ctx res stmt callee
@@ -348,6 +352,9 @@ module Make (ValueAnalysis : VALUE_ANALYSIS) = struct
 
   let compute threads =
     Logger.feedback "Starting lockset analysis";
+    (* TODO: Escape analysis should be moved to be part of the value analysis. *)
+    let module EscapeAnalysis = EscapeAnalysis.Make(ValueAnalysis) in
+    EscapeAnalysis.compute threads;
     let init_res = Result.empty in
     let thread_graph = ThreadAnalysis.Result.get_threads threads in
 

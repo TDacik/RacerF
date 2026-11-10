@@ -13,6 +13,8 @@ module type POWERSET = sig
   include BatSet.S with type elt := set and type t := t
   include Datatype_sig.PRINTABLE with type t := t
 
+  val mem_any : elt -> t -> bool
+
   val concat_map : (set -> t) -> t -> t
   (** Apply the function to each element and return union of results. *)
 

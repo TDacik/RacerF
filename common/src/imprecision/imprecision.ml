@@ -7,6 +7,7 @@ open Cil_datatype
 type t =
   | MemAccess of Stmt.t
   | Lock of Stmt.t * Exp.t
+  | EscapingLocalLock of Varinfo.t
   | Unlock of Stmt.t * Exp.t
   | FunctionPointer of Varinfo.t
   | ThreadParamArray of Stmt.t
@@ -47,6 +48,8 @@ let rec show = function
     Format.asprintf "Memory access at %a" Print_utils.pretty_stmt_short stmt
   | Lock (stmt, _) ->
     Format.asprintf "No lock at %a" Print_utils.pretty_stmt_short stmt
+  | EscapingLocalLock var ->
+    Format.asprintf "Escaping local lock %a" Varinfo.pretty var
   | Unlock (stmt, _) ->
     Format.asprintf "No unlock at %a" Print_utils.pretty_stmt_short stmt
   | FunctionPointer var ->

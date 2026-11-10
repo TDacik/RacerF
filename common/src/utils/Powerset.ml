@@ -11,6 +11,8 @@ module Make (Base : SET) = struct
   type elt = Base.elt [@@ocaml.warning "-34"]
   type set = Base.t   [@@ocaml.warning "-34"]
 
+  let mem_any x xss = exists (Base.mem x) xss
+
   let concat_map (fn : set -> t) (xss : t) =
     fold (fun xs acc -> union acc (fn xs)) xss empty
 
