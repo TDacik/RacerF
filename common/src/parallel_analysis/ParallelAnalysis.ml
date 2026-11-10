@@ -100,6 +100,16 @@ end
 
 open Context
 
+let always_returns_null thread =
+  Thread.get_entry_point thread
+  |> CIL_utils.kf_return_expressions
+  |> List.for_all CIL_utils.is_null
+
+let check_join stmt thread ret =
+  if CIL_utils.is_null ret then ()
+  else if always_returns_null thread then ()
+  else Imprecision.add (JoinWithReturn stmt)
+
 module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
 
   let update_on_create ctx state stmt id children arg =
@@ -112,7 +122,7 @@ module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
     | [t] -> Domain.set_must state t
     | ts -> Domain.set_may_list state ts
 
-  let update_on_join ctx state stmt id =
+  let update_on_join ctx state stmt id ret =
     let kf = Kernel_function.find_englobing_kf stmt in
     let dont_know_fallback () =
       Imprecision.add (Join stmt);
@@ -125,7 +135,11 @@ module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
       | Lval lval -> (
         let id = Cil.mkAddrOf ~loc:id.eloc lval in
         match ThreadAnalysis.Result.find_by_id_opt ctx.input id with
-        | Some thread -> Domain.set_must_not state thread
+        | Some thread -> (
+          (* TODO: check should go into ThreadAnalysis after its refactoring. *)
+          check_join stmt thread ret;
+          Domain.set_must_not state thread
+        )
         | None -> dont_know_fallback ()
       )
       | _ -> dont_know_fallback ()
@@ -136,7 +150,7 @@ module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
       let ctx = Context.add_visited ctx stmt state in
       let ctx', state' = match ConcurrencyModel.classify_stmt stmt with
         | Thread_create (id, children, arg) -> ctx, update_on_create ctx state stmt id children arg
-        | Thread_join (id, _) -> ctx, update_on_join ctx state stmt id
+        | Thread_join (id, ret) -> ctx, update_on_join ctx state stmt id ret
         | Call (_, _, fn, _) -> compute_call ctx state stmt fn
         | _ -> ctx, state
       in

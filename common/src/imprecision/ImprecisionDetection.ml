@@ -34,19 +34,6 @@ let check_functions () =
     else check_function kf
   )
 
-(** Check for pthread_join using the return value of a thread. This information
-    currently cannot be propagated by thread analysis. *)
-let check_join_with_return_value () =
-  let check stmt = match ConcurrencyModel.classify_stmt stmt with
-    | Thread_join (_, ret) ->
-      (** TODO: could be refined in common situation when thread always returns NULL *)
-      not @@ (CIL_utils.is_null ret)
-    | _ -> false
-  in
-  CFG_utils.filter_stmts check
-  |> List.iter (fun s -> add (JoinWithReturn s))
-
 let check () =
   check_functions ();
-  check_join_with_return_value ();
   ActiveWaitingDetection.run ()
