@@ -204,7 +204,8 @@ module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
       incr iteration;
       Logger.feedback "> iteration %d" !iteration;
       let ctx' = compute_step ctx in
-      if Context.equal ctx ctx' then ctx
+      let is_flat = not @@ ThreadAnalysis.Result.has_nested_threads ctx.input in
+      if Context.equal ctx ctx' || is_flat then ctx'
       else compute_until_fixpoint ctx'
 
   let compute threads =
