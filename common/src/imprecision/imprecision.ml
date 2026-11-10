@@ -11,6 +11,7 @@ type t =
   | FunctionPointer of Varinfo.t
   | ThreadParamArray of Stmt.t
   | Join of Stmt.t
+  | JoinWithReturn of Stmt.t
   | JoinInLoop of Stmt.t
   | ActiveWaiting of Stmt.t
   | TryLock of String.t
@@ -54,6 +55,8 @@ let rec show = function
     Format.asprintf "Thread created at %a has array parameter" Print_utils.pretty_stmt_short stmt
   | Join stmt ->
     Format.asprintf "Thread join at %a" Print_utils.pretty_stmt_short stmt
+  | JoinWithReturn stmt ->
+    Format.asprintf "Thread join with return at %a" Print_utils.pretty_stmt_short stmt
   | JoinInLoop stmt ->
     Format.asprintf "Thread join in loop at %a" Print_utils.pretty_stmt_short stmt
   | ActiveWaiting stmt ->

@@ -78,6 +78,11 @@ let parse_fn_create yaml =
   let arg = parse_int "argument-position" yaml in
   (parse_fn_name yaml, (id, entry_point, arg))
 
+let parse_fn_join yaml =
+  let id = parse_int "thread-id-position" yaml in
+  let ret = parse_int "return-value-position" yaml in
+  (parse_fn_name yaml, (id, ret))
+
 let load_thread_types = function
   | `A xs -> Thread_types.add_list @@ List.map Util.to_string_exn xs
   | _ -> ()
@@ -87,7 +92,7 @@ let load_thread_create = function
   | _ -> ()
 
 let load_thread_join = function
-  | `A xs -> Thread_join_functions.add_list @@ List.map (parse_fn1 "thread-id-position") xs
+  | `A xs -> Thread_join_functions.add_list @@ List.map parse_fn_join xs
   | _ -> ()
 
 let load_threads yaml =

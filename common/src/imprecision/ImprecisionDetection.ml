@@ -2,8 +2,6 @@
  *
  * Author: Tomas Dacik (idacik@fit.vut.cz), 2024 *)
 
-open Cil_types
-
 open Imprecision
 
 let allocation_functions = [
@@ -26,7 +24,7 @@ let check_function kf = match Kernel_function.get_name kf with
   | name when List.mem name semaphore_functions -> Imprecision.add Semaphore
   | "pthread_barrier_wait" -> Imprecision.add Barrier
   | "pthread_once" -> Imprecision.add PthreadOnce
-  | _ when ConcurrencyModel.is_atomic_fn kf && Kernel_function.has_definition kf ->
+  | _ when ConcurrencyModel.is_atomic_kf kf && Kernel_function.has_definition kf ->
     Imprecision.add (AtomicFnWithBody kf)
   | _ -> ()
 
@@ -36,22 +34,19 @@ let check_functions () =
     else check_function kf
   )
 
-let is_active_waiting stmt =
-  let rec check_instructions stmt = match stmt.skind with
-    | If (_, block_else, block_then, _) ->
-      List.for_all check_instructions block_else.bstmts
-      && List.for_all check_instructions block_then.bstmts
-    | Break _ -> true
-    | Block b -> List.for_all check_instructions b.bstmts
+(** Check for pthread_join using the return value of a thread. This information
+    currently cannot be propagated by thread analysis. *)
+let check_join_with_return_value () =
+  let check stmt = match ConcurrencyModel.classify_stmt stmt with
+    | Thread_join (_, ret) ->
+      (** TODO: could be refined in common situation when thread always returns NULL *)
+      not @@ (CIL_utils.is_null ret)
     | _ -> false
   in
-  match stmt.skind with
-  | Loop (_, block, _, _, _) -> begin match block.bstmts with
-    | stmts -> List.for_all check_instructions stmts
-    end
-  | _ -> false
+  CFG_utils.filter_stmts check
+  |> List.iter (fun s -> add (JoinWithReturn s))
 
 let check () =
   check_functions ();
-  let empty_while_loops = CFG_utils.filter_stmts is_active_waiting in
-  List.iter (fun s -> add (ActiveWaiting s)) empty_while_loops
+  check_join_with_return_value ();
+  ActiveWaitingDetection.run ()

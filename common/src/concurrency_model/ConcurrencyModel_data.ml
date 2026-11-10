@@ -105,7 +105,7 @@ module Condition_signal_functions = Imperative_map(String)(Int)
 
 module Thread_types            = Imperative_set(String)
 module Thread_create_functions = Imperative_map(String)(Int3)
-module Thread_join_functions   = Imperative_map(String)(Int)
+module Thread_join_functions   = Imperative_map(String)(Int2)
 
 (* Atomic *)
 

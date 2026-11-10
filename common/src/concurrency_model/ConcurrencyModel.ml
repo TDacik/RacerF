@@ -24,7 +24,7 @@ type stmt =
   | Condition_wait of Exp.t * Exp.t
   | Condition_signal of Exp.t
   | Thread_create of Exp.t * Exp.t * Exp.t
-  | Thread_join of Exp.t
+  | Thread_join of Exp.t * Exp.t
 
   | Atomic_seq_start
   | Atomic_seq_end
@@ -71,7 +71,10 @@ let classify_call ?lval fn args =
     Thread_create (id, thread, arg)
 
   else if Thread_join_functions.mem fn_name then
-    Thread_join (List.nth args @@ Thread_join_functions.find fn_name)
+    let id_pos, ret_pos = Thread_join_functions.find fn_name in
+    let id = List.nth args id_pos in
+    let ret = List.nth args ret_pos in
+    Thread_join (id, ret)
 
   else if AtomicSequenceStart.mem fn_name then
     Atomic_seq_start
@@ -111,6 +114,11 @@ let classify_stmt stmt = match stmt.skind with
 let get_thread_arg stmt = match classify_stmt stmt with
   | Thread_create (_, _, arg) -> arg
 
-let is_atomic_fn kf =
-  let name = Kernel_function.get_name kf in
+let is_atomic_name name =
   AtomicFunctions.exists (fun a -> Str.string_match (Str.regexp a) name 0)
+
+let is_atomic_fn varinfo =
+  is_atomic_name varinfo.vname
+
+let is_atomic_kf kf =
+  is_atomic_name @@ Kernel_function.get_name kf

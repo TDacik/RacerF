@@ -24,7 +24,7 @@ type stmt =
   | Thread_create of Exp.t * Exp.t * Exp.t
   (* Thread ID * Entry point * Argument *)
 
-  | Thread_join of Exp.t
+  | Thread_join of Exp.t * Exp.t
   (* Thread ID *)
 
   | Atomic_seq_start
@@ -40,4 +40,6 @@ val classify_stmt : Stmt.t -> stmt
 
 val get_thread_arg : Stmt.t -> Exp.t
 
-val is_atomic_fn : Kernel_function.t -> bool
+val is_atomic_fn : Varinfo.t -> bool
+
+val is_atomic_kf : Kernel_function.t -> bool
