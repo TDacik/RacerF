@@ -63,6 +63,10 @@ module Context = struct
     let cs = Callstack.push_event stmt ctx.callstack in
     {ctx with results = M.update cs (function None -> Some state | Some old -> Option.some @@ Domain.join old state) ctx.results}
 
+  let reset_thread_res ctx thread =
+    {ctx with results = M.filter (fun cs _ -> not @@ Thread.equal thread @@ Callstack.get_thread cs) ctx.results;
+              visited = VisitedCache.filter (fun (cs, _) -> not @@ Thread.equal thread @@ Callstack.get_thread cs) ctx.visited}
+
   (** True if in some callstack: t1 must run && t2 must run. *)
   let must_run_with ctx t1 t2 =
     M.exists (fun cs res -> Domain.must_run res t1 && Domain.must_run res t2) ctx.results
@@ -166,8 +170,9 @@ module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
     let entry_point = Thread.get_entry_point thread in
     let ctx = Context.set_thread ctx thread in
     let state = Context.compute_initial ctx thread in
+    let ctx = Context.reset_thread_res ctx thread in
     let stmt = Kernel_function.find_first_stmt entry_point in
-    Logger.debug "Computing for thread %s with %s" (Thread.show thread) (Domain.show state);
+    Logger.debug "Computing thread %s with %s" (Thread.show thread) (Domain.show state);
     match compute_stmt ctx state stmt with
     | None -> ctx
     | Some (ctx, _) -> ctx
@@ -175,7 +180,6 @@ module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
   let compute_step ctx =
     let thread_graph = ThreadAnalysis.Result.get_threads ctx.input in
     ThreadGraph.fold_vertex (fun thread ctx ->
-      Logger.debug "> Starting analysis of thread: %a" Thread.pp thread;
       ValueAnalysis.set_active_thread thread;
       compute_thread ctx thread_graph thread
     ) thread_graph ctx
@@ -194,7 +198,7 @@ module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
     let ctx0 = Context.init threads in
     let res = compute_until_fixpoint ctx0 in
     Logger.feedback "May-run-in-parallel analysis finished";
-    Logger.debug "%a" Context.pp res;
+    Logger.debug "Results:\n %a" Context.pp res;
     res
 
 end
