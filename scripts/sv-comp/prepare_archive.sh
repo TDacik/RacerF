@@ -21,8 +21,10 @@ mkdir -p -- "$DIR"
 
 ## Copy data and scripts
 sed "s/\$YEAR/$year/g" data/README_template.md > "$DIR/README.md"
+mkdir "$DIR"/test_programs
 cp data/smoketest.sh "$DIR"
-cp -r data/test_programs "$DIR/test_programs"
+cp ../../benchmarks/data_races/01-simple_races/01-simple_race.c  "$DIR"/test_programs/simple_race.c
+cp ../../benchmarks/data_races/02-simple_no_races/01-simple_no_race.c  "$DIR"/test_programs/simple_no_race.c
 cp -r ../../LICENSE "$DIR"
 cp -r ../../models "$DIR"
 cp -r ../../scripts/*.py "$DIR"
@@ -37,7 +39,7 @@ else
 fi
 
 ## Build standalone binary
-if [[ -d "$DIR" ]]; then
+if [[ -d _opam ]]; then
     echo "Directory _opam exists, skipping its creation"
 else
     echo "Directory _opam doesn't exists, creating standalone executable"
