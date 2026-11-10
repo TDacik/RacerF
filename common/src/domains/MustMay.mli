@@ -28,6 +28,8 @@ module Make (I : INPUT) : sig
 
   val set_may_list : t -> elem list -> t
 
+  val set_all_may : t -> t
+
   (** Queries *)
 
   val is_must : elem -> t -> bool

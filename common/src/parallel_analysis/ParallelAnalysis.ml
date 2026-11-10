@@ -124,13 +124,9 @@ module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
 
   let update_on_join ctx state stmt id ret =
     let kf = Kernel_function.find_englobing_kf stmt in
-    let dont_know_fallback () =
-      Imprecision.add (Join stmt);
-      state
-    in
     (** We cannot handle joining of threads in loops *)
     if Kernel_function.stmt_in_loop kf stmt
-    then (Imprecision.add (JoinInLoop stmt); state)
+    then Domain.set_all_may state
     else match id.enode with
       | Lval lval -> (
         let id = Cil.mkAddrOf ~loc:id.eloc lval in
@@ -140,9 +136,9 @@ module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
           check_join stmt thread ret;
           Domain.set_must_not state thread
         )
-        | None -> dont_know_fallback ()
+        | None -> Domain.set_all_may state
       )
-      | _ -> dont_know_fallback ()
+      | _ -> Domain.set_all_may state
 
   let rec compute_stmt ctx state stmt =
     if Context.was_visited ctx stmt state then None

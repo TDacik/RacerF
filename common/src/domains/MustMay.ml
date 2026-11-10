@@ -59,6 +59,8 @@ module Make (I : INPUT) = struct
 
   let set_must_not self x = M.remove x self
 
+  let set_all_may self = M.map (fun _ -> May) self
+
   (** Queries *)
 
   let is_must self x =
