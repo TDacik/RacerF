@@ -156,7 +156,7 @@ module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
       in
       let ctx'' = Context.add_stmt_summary ctx' stmt state' in
       List.fold_left (fun (acc_ctx, acc_state) succ ->
-        match compute_stmt acc_ctx acc_state succ with
+        match compute_stmt acc_ctx state' succ with
         | None -> (acc_ctx, acc_state)
         | Some (ctx_s, state_s) -> ctx_s, Domain.join state_s acc_state
       ) (ctx'', state') stmt.succs
