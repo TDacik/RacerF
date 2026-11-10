@@ -9,9 +9,10 @@ import os
 import sys
 import argparse
 
+from pathlib import Path
 from subprocess import run, PIPE, STDOUT
 
-from preprocess import preprocess
+from preprocess import preprocess_to_tmpfile
 from transformations import transform_under_approx
 
 # SV-COMP mode constants
@@ -180,9 +181,7 @@ class Runner:
 def preprocess_sources(source_files):
     acc = []
     for fname in source_files:
-        with open(fname, "r", encoding="latin1") as f:
-            lines = f.readlines()
-        acc.append(preprocess(fname, lines))
+        acc.append(preprocess_to_tmpfile(fname, Path(fname).read_text()))
     return acc
 
 

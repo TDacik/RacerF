@@ -16,7 +16,7 @@ let is_simple_assignment rhs =
 
 (** Frama-C/CIL sometimes creates the following:
       return_label: ; return ...; *) 
-let is_fallthroug_return target res = match target.skind, target.succs with
+let is_fallthrough_return target res = match target.skind, target.succs with
   | Instr (Skip _), [t] -> Stmt.equal res t
   | _ -> false
 
