@@ -57,7 +57,7 @@ class TestCase:
                 if re.search(r"//\s*race", line, re.IGNORECASE):
                     res.append(number)
         return not(res)
-    
+
     @staticmethod
     def get_expected_verdict(path):
         with open(path, "r") as f:
@@ -88,12 +88,12 @@ class TestCase:
             print_unknown(f"{prefix}: regression")
             return False
         if self.expected_verdict is None and actual == self.ground_truth:
-            print_improvement(f"{prefix}: correct!!")
+            print_fixed(f"{prefix}: correct!!")
             return True
         if self.expected_verdict is None and actual != self.ground_truth:
             print_err(f"{prefix}: TODO: wrong")
             return False
-        
+
         print_ok(f"{prefix}: OK")
         return True
 
