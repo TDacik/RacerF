@@ -4,7 +4,7 @@
 
 open WitnessUtils
 
-let version = "2.2"
+let version = "2.4"
 
 let get_machdep () = match Machine.machdep_name () with
   | "machdep_gcc_x86_32" -> "ILP32"
@@ -69,7 +69,7 @@ let final_waypoint n stmt : Yaml.value =
   `O  [
         ("type",      `String "target");
         ("action",    `String "follow");
-        (*"thread_id", `Float (Float.of_int n));*)
+        ("thread_id", `String "any");
         ("location",  `O (yaml_location stmt));
   ]
 
