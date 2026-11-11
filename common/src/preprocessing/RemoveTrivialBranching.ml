@@ -14,7 +14,6 @@ open Cil_datatype
 
 let is_instr stmt = match stmt.skind with Instr _ -> true | _ -> false
 let is_block stmt = match stmt.skind with Block _ -> true | _ -> false
-let is_block stmt = match stmt.skind with Block _ -> true | _ -> false
 
 let exp_as_const expr = match (Cil.stripCasts expr).enode with
   | Const c -> c
@@ -45,33 +44,43 @@ let inline fst snd =
           | Some i when Z.is_zero i -> b_else
           | None -> raise Exit
         in
-
-        let res = Cil.mkStmtCfgBlock (fst :: res.bstmts @ tail) in
-        res
+        Format.printf "Removing a branch\n";
+        b.bstmts <- res.bstmts @ tail;
+        b.blocals <- res.blocals @ b.blocals
       | _ -> raise Exit
       end
     | _ -> raise Exit
 
-class visitor proj = object
-  inherit Visitor.frama_c_refresh proj
+class visitor = object
+  inherit Visitor.frama_c_inplace
 
   method! vstmt_aux stmt = match stmt.skind with
     | Block block when List.length block.bstmts > 1 ->
       begin try
-        let fst, snd, tail = match block.bstmts with x :: y :: tl -> (x, y, tl) in
-        let res = Cil.mkStmtCfgBlock (inline fst snd :: tail) in
-        ChangeDoChildrenPost (res, fun x -> x)
+        Core0.feedback "Considering block at %d" (Print_utils.stmt_line stmt);
+        let fst, snd = match block.bstmts with x :: y :: _ -> (x, y) in
+        inline fst snd;
+        DoChildren
       with Exit | _ -> DoChildren
       end
     | _ -> DoChildren
 
 end
 
-let run () =
-  Core0.debug "Removing trivial IFs";
-  let proj' = Frama_c_kernel.File.create_project_from_visitor "remove-ifs" (new visitor) in
-  Project.set_current proj';
-  Ast.mark_as_changed ();
-  let file = Ast.get () in
-  Cfg.clearFileCFG ~clear_id:true file;
-  Cfg.computeFileCFG file
+let transform file =
+  Core0.feedback "Removing trivial IFs";
+  Visitor.visitFramacFileSameGlobals (new visitor) file;
+  List.iter (function
+    | GFun (fundec, _) -> Frama_c_kernel.File.must_recompute_cfg fundec
+    | _ -> ()
+  ) file.globals;
+  Ast.mark_as_changed ()
+
+let run file =
+  if Core0.Inline.get () then transform file
+  else ()
+
+let () =
+  let module F = Frama_c_kernel.File in
+  let category = F.register_code_transformation_category "remove-trivial-branching" in
+  F.add_code_transformation_after_cleanup ~after:[Unfold_loops.transform] category run

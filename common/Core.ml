@@ -50,9 +50,7 @@ let finalize ls_res thread_res =
 (** Following is intended only for testing thread analysis without running Deadlock/Racer. *)
 
 let run () =
-  if Core0.Inline.get () then
-    RemoveTrivialBranching.run ()
-  else if JustThreadAnalysis.get () then
+  if JustThreadAnalysis.get () then
     let module ValueAnalysis = (val init ()) in
     let module ThreadAnalysis = ThreadAnalysis.Make(ValueAnalysis) in
     let threads =  ThreadAnalysis.compute () in

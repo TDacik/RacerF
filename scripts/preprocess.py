@@ -5,7 +5,7 @@ import re
 import sys
 
 from pathlib import Path
-from tempfile import NamedTemporaryFile
+from tempfile import mkdtemp
 
 translation = [
     ("__float128", "float"),
@@ -103,7 +103,7 @@ def preprocess(string):
                         end="",
                     )
                     new_line = re.sub(pattern, target, new_line)
-                    print("  ==> ", new_line, end="")
+                    print("  ==> ", new_line)
 
             # Remove overloading
             # cnt = 0
@@ -123,16 +123,14 @@ def preprocess(string):
 
 def preprocess_to_tmpfile(orig_path, string):
     res = preprocess(string)
-
     path = Path(orig_path)
-    tmp_file = NamedTemporaryFile(
-        prefix=path.stem, suffix=".pp.c", delete=False, dir="/tmp"
-    )
 
-    with open(tmp_file.name, "w") as f:
-        f.write(rewrite_atomic("".join(res)))
+    tmp = mkdtemp(prefix=path.stem)
+    file = Path(tmp) / path.name
+    with open(file, "w") as f:
+        f.write(res)
 
-    return tmp_file.name
+    return str(file.resolve())
 
 
 if __name__ == "__main__":

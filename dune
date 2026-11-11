@@ -47,7 +47,7 @@
 (install
   (package frama-c-racer)
   (section bin)
-  (files scripts/preprocess.py scripts/transformations.py (scripts/racerf.py as racerf))
+  (files scripts/preprocess.py (scripts/racerf.py as racerf))
 )
 
 

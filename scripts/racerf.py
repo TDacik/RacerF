@@ -13,7 +13,6 @@ from pathlib import Path
 from subprocess import run, PIPE, STDOUT
 
 from preprocess import preprocess_to_tmpfile
-from transformations import transform_under_approx
 
 # SV-COMP mode constants
 SV_COMP_MODE = False
@@ -23,10 +22,7 @@ OPAM_PATH = os.path.abspath(os.path.join(SELF, "_opam/"))
 
 
 def remove_if_exists(path):
-    try:
-        os.remove(path)
-    except FileNotFoundError:
-        pass
+    Path(path).unlink(missing_ok=True)
 
 
 class Runner:
@@ -120,12 +116,13 @@ class Runner:
         return self.run_racer_once(source_file, options)
 
     def run_under_approx(self, source_file, options, orig_source_file):
-        source_file_under = transform_under_approx(self, source_file, options)
-        options = options + [
+        options = [
+            "-ulevel=2",
+            "-cc-inline",
             "-cc-thread-approx=under",
             f"-cc-orig-sources={orig_source_file}",
-        ]
-        return self.run_racer_once(source_file_under, options)
+        ] + options
+        return self.run_racer_once(source_file, options)
 
     def hotfix_eva_error(self, res):
         if res.returncode == 1 and "Eva not started because globals initialization is not computable." in res.stdout:
