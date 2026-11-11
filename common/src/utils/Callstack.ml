@@ -81,10 +81,11 @@ let show_event ?prefix cs =
   Format.asprintf "%s%s" prefix stmt
 
 let show ?event cs =
-  let event_str = match event with
-    | None -> "<no_event>"
-    | Some event ->
-      Format.asprintf "%s at %a" event Print_utils.pretty_stmt_short @@ Option.get cs.event
+  let event_str = match event, cs.event with
+    | None, None -> "<no_event>"
+    | None, Some stmt -> Format.asprintf "%a" Print_utils.pretty_stmt_short stmt
+    | Some event, Some stmt ->
+      Format.asprintf "%s at %a" event Print_utils.pretty_stmt_short stmt
   in
   Format.asprintf "In thread %s:\n        %s\n            %s"
     (Thread.show cs.thread)

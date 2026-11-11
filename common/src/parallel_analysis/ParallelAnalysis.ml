@@ -162,8 +162,8 @@ module Make (ValueAnalysis : ValueAnalysis_sig.VALUE_ANALYSIS) = struct
   and compute_call ctx state callsite expr =
     let callees = ValueAnalysis.eval_call callsite expr in
     List.fold_left (fun (acc_ctx, acc_state) callee ->
-      let ctx' = Context.push_call ctx callsite callee in
-      let ctx_s, state_s = compute_function ctx' acc_state callee in
+      let ctx' = Context.push_call acc_ctx callsite callee in
+      let ctx_s, state_s = compute_function ctx' state callee in
       Context.pop_call ctx_s, Domain.join state_s acc_state
     ) (ctx, state) callees
 
