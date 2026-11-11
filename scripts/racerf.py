@@ -129,6 +129,37 @@ class Runner:
             return 0
         return res.returncode
 
+    def print_reason_unknown(self, res1, res2, default="other"):
+        out = res1 + res2
+        if "Active waiting at" in out:
+            reason = "Active waiting"
+        elif "Atomic function with implementation" in out:
+            reason = "Atomic function"
+        elif "Unsupported granularity of _Atomic" in out:
+            reason = "_Atomic"
+        elif "Semaphores" in out:
+            reason = "Semaphores"
+        elif "Barriers" in out:
+            reason = "Barriers"
+        elif "Function pthread_once" in out:
+            reason = "pthread_one"
+        elif "possible deadlock" in out:
+            reason = "possible deadlock"
+        elif "Trylock status cannot be checked" in out:
+            reason = "trylock"
+        elif "No lock" in out or "No unlock" in out or "Escaping local lock" in out:
+            reason = "locksets"
+        elif "The result may be imprecise" in out:
+            reason = "other"
+        else:
+            reason = None
+
+        if reason is not None:
+            print(f"Reason unknown: {reason}")
+
+        return
+
+
     def run_racer(self, source_file, options, args, orig_source_file):
         if args.over_approx:
             options += ["-cc-nondet-assignments"]
@@ -150,13 +181,17 @@ class Runner:
             remove_if_exists("witness.graphml")
 
             res2 = self.run_under_approx(source_file, options, orig_source_file)
-            print(res2.stdout)
 
             if "[racer] Data race " in res2.stdout:
+                print(res2.stdout)
+                self.print_reason_unknown("", res2.stdout)
                 return self.hotfix_eva_error(res2)
 
             # We need to print this to match our short-sighted defininition of Benchexec's tool info
+            print(res1.stdout)
+            print(res2.stdout)
             print("[SV-wrapper] The result may be imprecise")
+            self.print_reason_unknown(res1.stdout, res2.stdout, default="inconclusive")
             return 0
 
     def setup(self):
