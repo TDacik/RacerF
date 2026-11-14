@@ -113,6 +113,17 @@ module AtomicFunctions     = Imperative_set(String)
 module AtomicSequenceStart = Imperative_set(String)
 module AtomicSequenceEnd   = Imperative_set(String)
 
+(* Currently not used in analysis *)
+module InitOnce = Imperative_map(String)(Int2)
+
+(* Functions used to model init_once *)
+module InitOnce_start = Imperative_map(String)(Int)
+module InitOnce_end = Imperative_map(String)(Int)
+
+let () =
+  InitOnce_start.add ("__racerf_init_once_start", 0);
+  InitOnce_end.add ("__racerf_init_once_end", 0)
+
 let print () =
   Lock_types.print "Lock types";
   Lock_init_functions.print "Lock init functions";
@@ -132,4 +143,8 @@ let print () =
 
   AtomicFunctions.print "Atomic function prefixes";
   AtomicSequenceStart.print "Atomic sequence start";
-  AtomicSequenceEnd.print "Atomic sequence end"
+  AtomicSequenceEnd.print "Atomic sequence end";
+
+  InitOnce.print "Init once functions";
+  InitOnce_start.print "Init once start functions";
+  InitOnce_end.print "Init once end functions"

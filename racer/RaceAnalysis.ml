@@ -253,7 +253,7 @@ module Make (ValueAnalysis : VALUE_ANALYSIS) = struct
       Racer.debug ">     Accesses on call:";
       Racer.debug ">       - Reads : %a" MemoryAddress.pp_list (List.map fst reads);
       Racer.debug ">       - Writes (lval init): %a" MemoryAddress.pp_list writes1;
-      Racer.debug ">       - Callees:\n";
+      Racer.debug ">       - Callees: %a\n" (Format.pp_print_list Kernel_function.pretty) callees;
 
       let lss = stmt_lockset ctx stmt in
       let res' = Result.update_writes stmt ctx.callstack lss res writes1 in

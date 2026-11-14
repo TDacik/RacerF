@@ -6,7 +6,7 @@ open Imprecision
 
 (** Return true if the given imprecision may hide a race. *)
 let could_cause_unsoundness = function
-  | Unlock _ | FunctionPointer _ | Semaphore | PthreadOnce
+  | Unlock _ | FunctionPointer _ | Semaphore
   | JoinWithReturn _ | EscapingLocalLock _ -> true
   | _ -> false
 

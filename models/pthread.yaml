@@ -83,6 +83,12 @@ Conditions:
       condition-position: 0
       lock-position: 1
 
+# pthread_once is supported, but cannot be currently specified this way
+# InitOnce:
+#   - function: "pthread_once"
+#     control-position: 0
+#     callee-position: 1
+
 Threads:
   types: ["pthread_t"]
   create:

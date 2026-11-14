@@ -5,6 +5,7 @@
  *
  * Author: Tomas Dacik (idacik@fit.vut.cz), 2021 *)
 
+open Cil_types
 open Cil_datatype
 
 open ConcurrencyModel_data
@@ -29,6 +30,9 @@ type stmt =
   | Atomic_seq_start
   | Atomic_seq_end
   | Atomic_call of Exp.t * Exp.t list
+
+  | Init_once_start of Exp.t
+  | Init_once_end of Exp.t
 
   | Call of call_type * Lval.t option * Cil_types.lhost * Exp.t list
 
@@ -81,6 +85,16 @@ let classify_call ?lval fn args =
 
   else if AtomicSequenceEnd.mem fn_name then
     Atomic_seq_end
+
+  else if InitOnce_start.mem fn_name then
+    let control_pos = InitOnce_start.find fn_name in
+    let control = List.nth args control_pos in
+    Init_once_start control
+
+  else if InitOnce_end.mem fn_name then
+    let control_pos = InitOnce_end.find fn_name in
+    let control = List.nth args control_pos in
+    Init_once_end control
 
   else
     let call_type = match fn with

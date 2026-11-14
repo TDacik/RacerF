@@ -106,7 +106,7 @@ module Result = struct
 
   let filter_trylocks state lss =
     let open Lock in
-    let check_status lock = match lock.status, lock.kind.blocking with
+    let check_status lock = match lock.status, Lock.is_blocking lock with
       |  _, true -> true
       | None, _ -> true
       | Some status, false ->
@@ -196,15 +196,39 @@ module Make (ValueAnalysis : VALUE_ANALYSIS) = struct
       | Some (b, _) -> Imprecision.add (EscapingLocalLock (Base.to_varinfo b))
       | None -> ()
 
-  let rec update_on_lock ctx res stmt expr kind status =
+  let update_on_once_start ctx res stmt control =
+    let values = ValueAnalysis.eval_expr_concretised ~callstack:ctx.callstack stmt control in
+    (* TODO: provide some information that this is an abstract lock *)
+    check_lock_values stmt control values;
+    let controls =
+      List.map (fun (b, o) -> Lock.mk_once_running ~callstack:ctx.callstack b o) values
+    in
+    Lock.PowerSet.add_each ctx.lockset controls, res
+
+  let update_on_once_end ctx res stmt control =
+    let values = ValueAnalysis.eval_expr_concretised ~callstack:ctx.callstack stmt control in
+    let locks = List.map (fun (b, o) ->
+        Lock.mk_once_running ~callstack:ctx.callstack b o,
+        Lock.mk_once_finished ~callstack:ctx.callstack b o
+      ) values
+    in
+    match locks with
+    | [removed, added] ->
+      Lock.PowerSet.singleton @@ Lock.Set.remove removed (Lock.Set.add added ctx.lockset), res
+    | _ ->
+      (* TODO: provide some information that this is an abstract lock *)
+      Imprecision.add (Lock (stmt, control));
+      Lock.PowerSet.singleton ctx.lockset, res
+
+  let rec update_on_lock ctx res stmt expr properties status =
     let lock_values = ValueAnalysis.eval_expr_concretised ~callstack:ctx.callstack stmt expr in
     check_lock_values stmt expr lock_values;
 
     let callstack = Callstack.push_event stmt ctx.callstack in
 
     let locked = List.map (fun (base, offset) -> match status with
-      | None -> Lock.mk ~callstack ~kind base offset
-      | Some status -> Lock.mk ~callstack ~kind ~status base offset
+      | None -> Lock.mk ~callstack ~properties base offset
+      | Some status -> Lock.mk ~callstack ~properties ~status base offset
     ) lock_values
     in
     Logger.debug ">       [|%a|] = %s" Exp.pretty expr (Lock.show_list locked);
@@ -222,7 +246,8 @@ module Make (ValueAnalysis : VALUE_ANALYSIS) = struct
 
     let lss = match lock_values with
     (* TODO: is this covered? *)
-    | [] when Lock.Set.is_empty ctx.lockset -> Lock.PowerSet.singleton ctx.lockset
+    | [] when Lock.Set.is_empty ~ignore_builtin:true ctx.lockset ->
+        Lock.PowerSet.singleton ctx.lockset
     | [] -> Lock.Set.fold (fun lock acc ->
                Lock.PowerSet.add (Lock.Set.remove lock ctx.lockset) acc
             ) ctx.lockset Lock.PowerSet.empty
@@ -280,6 +305,8 @@ module Make (ValueAnalysis : VALUE_ANALYSIS) = struct
         | Call (_, _, callee, _) -> update_on_call ctx res stmt callee
         | Atomic_seq_start -> Lock.PowerSet.add_each ctx.lockset [Lock.global_lock ()], res
         | Atomic_seq_end -> Lock.PowerSet.remove_each ctx.lockset [Lock.global_lock ()], res
+        | Init_once_start control -> update_on_once_start ctx res stmt control
+        | Init_once_end control -> update_on_once_end ctx res stmt control
         | _ -> Lock.PowerSet.singleton ctx.lockset, res
       in
       Logger.debug ">     ~> %a" Lock.PowerSet.pp lss;
@@ -344,7 +371,7 @@ module Make (ValueAnalysis : VALUE_ANALYSIS) = struct
 
     (** TODO: inter/union *)
     let unreleased_locks = Lock.PowerSet.flatten_union lss in
-    (if not @@ Lock.Set.is_empty unreleased_locks then
+    (if not @@ Lock.Set.is_empty ~ignore_builtin:true unreleased_locks then
       Imprecision.add (UnreleasedLock (fn, Lock.Set.choose unreleased_locks))
     );
 

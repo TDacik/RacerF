@@ -89,6 +89,9 @@ class Runner:
             f'-cpp-extra-args="-include'
             + os.path.join(self.models_path, "__racerf_atomic_typedefs.h")
             + '"',
+            f'-cpp-extra-args="-include'
+            + os.path.join(self.models_path, "__racerf_pthread.h")
+            + '"',
             # Needs to be added directly, not with '-include'!
             os.path.join(self.libc_path, "stdlib.h"),
             "-racer",

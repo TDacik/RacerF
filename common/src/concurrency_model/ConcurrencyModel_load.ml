@@ -138,11 +138,23 @@ let load_conditions yaml =
   load_or_skip load_cond_types "types" yaml;
   load_or_skip load_cond_wait "wait" yaml
 
+(** Init once *)
+
+let parse_init_once yaml =
+  let control = parse_int "control-position" yaml in
+  let callee = parse_int "callee-position" yaml in
+  (parse_fn_name yaml, (control, callee))
+
+let load_init_once = function
+  | `A xs -> InitOnce.add_list @@ List.map parse_init_once xs
+  | _ -> ()
+
 let load_model value =
   load_or_skip load_locks "Locks" value;
   load_or_skip load_threads "Threads" value;
   load_or_skip load_atomic "Atomic" value;
-  load_or_skip load_conditions "Conditions" value
+  load_or_skip load_conditions "Conditions" value;
+  load_or_skip load_init_once "InitOnce" value
 
 let load path =
   Core0.debug "Loading %s\n" path;
